@@ -1,0 +1,71 @@
+2012-10-27 16:35:04,486 DEBUG: Removing User: 10.2.16.203:52447/asdf@lab
+2012-10-27 17:25:58,436 ERROR: Error checking args for function checkMyINFO, user 10.1.130.148:50516/asdda, args '$ALL asdda <++ V:0.75,M:A,H:1/0/0,S:1>$ $0.005\x01$$0$'
+2012-10-27 17:25:58,436 DEBUG: Removing User: 10.1.130.148:50516/asdda
+2012-10-27 17:26:19,590 ERROR: Error checking args for function checkMyINFO, user 10.1.130.148:50037/asdda, args '$ALL asdda <++ V:0.75,M:A,H:1/0/0,S:1>$ $0.005\x01$$0$'
+2012-10-27 17:26:19,590 DEBUG: Removing User: 10.1.130.148:50037/asdda
+2012-10-27 17:27:15,551 ERROR: Error checking args for function checkMyINFO, user 10.1.130.148:50670/asdda, args '$ALL asdda <++ V:0.75,M:A,H:1/0/0,S:1>$ $0.005\x01$$0$'
+2012-10-28 07:34:55,840 DEBUG: Removing User: 10.1.39.196:53449/dsfasdfasdfasd
+2012-10-28 12:41:22,958 ERROR: Error checking args for function checkMyINFO, user 10.1.130.148:45806/asdda, args '$ALL asdda <++ V:0.75,M:A,H:1/0/0,S:1>$ $0.005\x01$$0$'
+2012-10-28 12:41:22,959 DEBUG: Removing User: 10.1.130.148:45806/asdda
+2012-10-28 12:42:00,452 ERROR: Error checking args for function checkMyINFO, user 10.1.130.148:35515/asdda, args '$ALL asdda <++ V:0.75,M:A,H:1/0/0,S:1>$ $0.005\x01$$0$'
+2012-10-28 12:42:00,452 DEBUG: Removing User: 10.1.130.148:35515/asdda
+2012-10-28 12:54:14,849 ERROR: Error checking args for function checkMyINFO, user 10.1.130.148:38229/asdda, args '$ALL asdda <++ V:0.75,M:A,H:1/0/0,S:1>$ $0.005\x01$$0$'
+2012-10-28 12:54:14,849 DEBUG: Removing User: 10.1.130.148:38229/asdda
+2012-10-28 15:22:25,593 DEBUG: User logged in: 10.1.35.107:20391/asd
+2012-10-28 15:34:08,627 ERROR: Error checking args for function checkMyINFO, user 10.1.130.148:51329/asdda, args '$ALL asdda <++ V:0.75,M:A,H:1/0/0,S:1>$ $0.005\x01$$0$'
+2012-10-28 15:34:08,628 DEBUG: Removing User: 10.1.130.148:51329/asdda
+2012-10-28 15:36:03,620 DEBUG: User logged in: 10.1.130.148:35164/asdda
+2012-10-28 15:57:39,460 DEBUG: User logged in: 10.1.36.98:39480/asdhfksdf
+2012-10-28 16:24:54,041 DEBUG: Client disconnected: 10.1.35.107:20391/asd
+2012-10-28 16:24:54,042 DEBUG: Removing User: 10.1.35.107:20391/asd
+2012-10-28 17:35:19,176 DEBUG: User logged in: 10.1.34.145:50778/asdafs
+2012-10-28 17:35:22,089 INFO: User:asdafs issued +read. Status:Success
+2012-10-28 17:40:12,608 INFO: User:asdafs issued +read. Status:Success
+2012-10-28 17:41:59,123 DEBUG: Client disconnected: 10.1.34.145:50778/asdafs
+2012-10-28 17:41:59,123 DEBUG: Removing User: 10.1.34.145:50778/asdafs
+2012-10-28 17:41:59,488 DEBUG: User logged in: 10.1.34.145:50798/asdafs
+2012-10-28 17:43:16,608 DEBUG: Client disconnected: 10.1.34.145:50798/asdafs
+2012-10-28 17:43:16,608 DEBUG: Removing User: 10.1.34.145:50798/asdafs
+2012-10-28 17:43:17,565 DEBUG: User logged in: 10.1.34.145:50814/asdafs
+2012-10-28 17:45:16,383 DEBUG: Client disconnected: 10.1.34.145:50814/asdafs
+2012-10-28 17:45:16,383 DEBUG: Removing User: 10.1.34.145:50814/asdafs
+2012-10-28 17:45:17,217 DEBUG: User logged in: 10.1.34.145:50830/asdafs
+2012-10-28 17:45:44,805 DEBUG: Client disconnected: 10.1.34.145:50830/asdafs
+2012-10-28 17:45:44,806 DEBUG: Removing User: 10.1.34.145:50830/asdafs
+2012-10-28 17:50:02,701 DEBUG: User logged in: 10.1.34.145:50868/asdafs
+2012-10-28 17:50:10,104 INFO: User:asdafs issued +read. Status:Success
+2012-10-28 18:17:18,272 DEBUG: Removing connection due to error in receiving data: 10.1.34.145:50868/asdafs
+2012-10-28 18:17:18,272 DEBUG: Removing User: 10.1.34.145:50868/asdafs
+2012-10-28 19:12:17,328 DEBUG: User logged in: 10.1.34.145:51175/asdafs
+2012-10-28 19:13:22,447 INFO: User:asdafs issued +read. Status:Success
+2012-10-28 19:15:00,414 DEBUG: Client disconnected: 10.1.34.145:51175/asdafs
+2012-10-28 19:15:00,414 DEBUG: Removing User: 10.1.34.145:51175/asdafs
+2012-10-28 19:15:01,368 DEBUG: User logged in: 10.1.34.145:51299/asdafs
+2012-10-28 19:15:12,314 DEBUG: Client disconnected: 10.1.34.145:51299/asdafs
+2012-10-28 19:15:12,314 DEBUG: Removing User: 10.1.34.145:51299/asdafs
+2012-10-28 19:15:12,375 DEBUG: User logged in: 10.1.34.145:51302/asdafs
+2012-10-28 19:15:19,874 DEBUG: Client disconnected: 10.1.34.145:51302/asdafs
+2012-10-28 19:15:19,874 DEBUG: Removing User: 10.1.34.145:51302/asdafs
+2012-10-28 19:15:20,379 DEBUG: User logged in: 10.1.34.145:51303/asdafs
+2012-10-28 19:15:42,179 DEBUG: Client disconnected: 10.1.34.145:51303/asdafs
+2012-10-28 19:15:42,179 DEBUG: Removing User: 10.1.34.145:51303/asdafs
+2012-10-28 19:19:55,250 DEBUG: User logged in: 10.1.34.145:49185/asdafs
+2012-10-28 19:23:52,425 DEBUG: Client disconnected: 10.1.34.145:49185/asdafs
+2012-10-28 19:23:52,425 DEBUG: Removing User: 10.1.34.145:49185/asdafs
+2012-10-28 19:40:55,073 DEBUG: User logged in: 10.1.33.71:45143/qweasd
+2012-10-28 19:41:00,869 INFO: User:qweasd issued +read. Status:Success
+2012-10-28 19:42:30,712 DEBUG: Client disconnected: 10.1.33.71:45143/qweasd
+2012-10-28 19:42:30,713 DEBUG: Removing User: 10.1.33.71:45143/qweasd
+2012-10-28 19:44:11,239 DEBUG: User logged in: 10.1.33.71:50664/qweasd
+2012-10-28 19:50:14,337 INFO: User:qweasd issued +read. Status:Success
+2012-10-28 19:51:51,922 DEBUG: Client disconnected: 10.1.33.71:50664/qweasd
+2012-10-28 19:51:51,922 DEBUG: Removing User: 10.1.33.71:50664/qweasd
+2012-10-28 20:37:53,472 DEBUG: Removing connection due to error in receiving data: 10.1.130.148:35164/asdda
+2012-10-28 20:37:53,472 DEBUG: Removing User: 10.1.130.148:35164/asdda
+2012-10-28 21:13:37,363 DEBUG: User logged in: 10.1.33.71:60117/qweasd
+2012-10-28 21:13:40,892 INFO: User:qweasd issued +read. Status:Success
+2012-10-28 21:16:57,164 DEBUG: Client disconnected: 10.1.33.71:60117/qweasd
+2012-10-28 21:16:57,165 DEBUG: Removing User: 10.1.33.71:60117/qweasd
+2012-10-28 21:47:46,754 ERROR: Error checking args for function checkMyINFO, user 10.1.130.148:34616/asdda, args '$ALL asdda <++ V:0.75,M:A,H:1/0/0,S:1>$ $0.005\x01$$0$'
+2012-10-28 21:47:46,755 DEBUG: Removing User: 10.1.130.148:34616/asdda
+2012-10-28 21:47:57,388 DEBUG: User logged in: 10.1.130.148:41101/asdda

@@ -1,0 +1,188 @@
+# py-dchub configuration file
+
+[dchub]
+
+# The name of the hub
+name = HyperNova
+
+# Bind to ip and port.  Blank ip binds to all available ip addresses
+ip = 10.2.32.223
+port = 411 
+
+# Locations of important files/directories.  Relative paths listed here are
+# relative to the location of the hub program, not the location of this file
+# or the current directory of the user launching the program.
+accountsfile = accounts
+welcomefile = welcome
+usercommandsfile = usercommands
+botsdir = bots
+
+# If 1, py-dchub raises some log levels and under Unix it logs to the standard
+# output and doesn't fork (as is typical of a daemon)
+debug = 1
+
+# If 1, translates /me and +me chat messages
+handleslashme = 1
+
+# If 1, notifies users if their message is dropped due to spam/flood protection
+notifyspammers = 1
+
+# If there is an entry here, it redirects users to it if the hub is full,
+# instead of simply denying them access
+hubredirectwhenfull = 
+
+# Maximum number of logged in users
+maxusers = 1000
+
+# After a user logs in, amount of time to wait until another user with the same
+# IP or nick can log in.  This prevents users from joining and leaving 
+# repeatedly as a form of spam to other users who log joins/leaves.  It also
+# serves as a limited form of denial of service protection.
+joinfloodtime = 0 
+
+
+### Logging options
+## Logging levels for specific messages can be set near the bottom of the file
+
+# Main log file location
+logfile = log
+
+# Logging Level (must be DEBUG, INFO, WARNING, ERROR, or CRITICAL, or a number
+# between 1 and 50 inclusive)
+loglevel = DEBUG
+
+## Syslog logging
+# Note that syslog has its own logging levels, which may be higher than the one
+# you set above.  You may want to read the syslog.conf man page to change the 
+# syslog logging level.
+
+# Whether or not to log via syslog
+usesyslog = 0
+
+# Syslog host and facility to use.  If sysloghost contians a /, it will be 
+# interpreted as a unix domain socket.  Otherwise, it will be interpreted as a
+# hostname and logging will be done via a UDP socket to port 514.
+sysloghost = /dev/log
+syslogfacility = daemon
+
+
+### Unix specific options
+# Location of pid file
+pidfile = pid
+
+# Change the user and group id to those given by the username and groupname, 
+# or just use the privileges of user invoking py-dchub.  You need to start the
+# hub as the super user for this to work.
+changeuidgid = 1
+username = dchub
+groupname = daemon
+
+# Chroot mode
+# If 1, will chroot to the directory in which it is located after reading this 
+# configuration file, but before reading other files listed above.  You must
+# invoke py-dchub as the super user for this to work.  Note that after
+# chrooting, py-dchub will not be able to load any additional python modules
+# that are not located under the chroot (though ones loaded before the chroot
+# will be available)
+chroot = 1
+
+
+[dchub-userlimits]
+
+## All of these limits can be changed on a per user basis inside the hub
+## (either by an extension to the hub or by a bot such as PythonBot)
+
+# Maximum size of any command
+maxcommandsize = 25000
+
+# Maximum length of user's nick
+maxnicklength = 25
+
+# Minimum share size for users
+# minsharesize = 2000000000
+minsharesize = 0
+#`25000000000
+
+# Maximum length of user's description
+maxdescriptionlength = 50
+
+# Maximum length of user's tag
+maxtaglength = 50
+
+# Maximum length of user's email address
+maxemaillength = 50
+
+# Maximum size of chat message
+maxmessagesize = 500
+
+# Maximum new lines per chat message
+maxnewlinespermessage = 5
+
+# Maximum size of search message
+maxsearchsize = 500
+
+# Time before hub sends an empty command to users, in seconds
+pingtime = 300
+
+# Time period for limits, in seconds (see below)
+timeperiod = 60
+
+# Maximum chat characters per time period
+maxcharacterspertimeperiod = 1000
+
+# Maximum new lines per time period
+maxnewlinespertimeperiod = 10
+
+# Maximum chat messages per time period
+maxmessagespertimeperiod = 10
+
+# Maximum search messages per time period
+maxsearchespertimeperiod = 10
+
+# Maximum MyINFO changes per time period
+maxmyinfopertimeperiod = 3
+
+# The maximum number of commands to process per time period (any additional
+# commands are queued)
+maxcommandspertimeperiod = 20
+
+# Maximum number of queued commands (any additional commands are dropped)
+maxqueuedcommands = 20
+
+[dchub-loglevels]
+
+# Log levels for py-dchub.  Mostly useful for debugging
+
+loadfileerror = 40
+missingfile = 30
+hubstatus = 20
+boterror = 20
+duplicatelogin = 20
+userloginerror = 20
+loading = 10
+commanderror = 10
+wrapping = 10
+execchange = 10
+newconnection = 10
+useradderror = 10
+userdisconnect = 10
+userlogin = 10
+userremove = 10
+socketerror = 10
+datareceived = 5
+badcommand = 5
+loadingdebug = 3
+datasent = 1
+
+# Only used if you want to bind to IPs/ports in addition to the ones specified
+# in the main config
+#[dchub-bindings]
+#
+# Bind to specific IP/port
+#ignored_name = 192.168.1.4:4382
+# Bind to specific port on all available IPs
+#ignored_name2 = :2834
+# Bind to a random port on a specific IP!?
+#ignored_name3 = 192.168.1.12:0
+# Bind to a random port on all IPs!?
+#ignored_name4 = :0

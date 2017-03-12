@@ -1,0 +1,17 @@
+# py-dchub accounts file
+# format is:
+# nick = password|opflag|extradata
+# opflag is 1 for op and 0 for regular user
+# extradata is an arbitrary string you would like to associate with this
+#  account, which could be used to implement more specific permissions
+
+[dchub-accounts]
+
+#PythonUser = testpassword|1|PythonBot
+JohnDoe = check|1|shit
+admin = check|1|shit
+DarkRoom = <password>|1|shit
+DarkRoom@Lab = <password>|1|shit
+lol = lol|1|shit
+Dhruv@lab = cvit123|1|shit
+Doga = cvit123|1|shit

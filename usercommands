@@ -1,0 +1,27 @@
+# Format of user commands:
+# Name = Who Order Type Context Details
+# Name is the internal name of the user command
+# If the command is related to a bot, it should be in the form:
+#  BotName$CommandName
+# Who decides who gets the command, a combination of the following
+#  1 - User
+#  2 - Op
+#  4 - Account holder with bot name (or command name if no related bot) in args
+#  8 - Bot with bot name must be logged in
+#  So a Who of 11 means that the user must be logged in, the user must be an 
+#   op, and the related bot must be logged in.
+# Order is the order of the commands sent to the user, commands are sent in
+#  ascending order (this can be an integer or a float
+# For Type, Context, and Details, see:
+#  http://dcplusplus.sourceforge.net/wiki/index.php/UserCommand%20command
+# For Details, note that py-dchub already does translations for $ and |.
+# See the usercommand file in the examples folder for examples
+
+[dchub-usercommands]
+
+UserIP = 3 1 2 6 Get User IP$UserIP %[nick]|
+BanBot$BanIP = 11 2.1 2 1 Ban IP$To: BanBot From: %[mynick] $<%[mynick]> %[line:IP] %[line:Time]|
+BanBot$BanNickIP = 11 2.2 2 6 Ban\Ban IP$To: BanBot From: %[mynick] $<%[mynick]> <>%[nick] %[line:Time]|
+BanBot$BanNick = 11 2.3 2 6 Ban\Ban Nick$To: BanBot From: %[mynick] $<%[mynick]> %%%[nick] %[line:Time]|
+PythonBot$SendCommand = 13 3.1 2 1 Send Python Command$To: PythonBot From: %[mynick] $<%[mynick]> %[line:PythonCommand]|
+PythonBot$ReloadBots = 13 3.2 2 1 Reload Bots$To: PythonBot From: %[mynick] $<%[mynick]> hub.loadbots()|

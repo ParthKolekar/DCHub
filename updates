@@ -1,0 +1,58 @@
+ === Nov 11, 2012 ===
+1. Added a message to "welcome" asking downloaders to include magnet links in their +add messages. -DarkRoom
+2. Cleaned the requests file - deleted some shit which was, well, shit. -DarkRoom
+
+::: DCHub NOT restarted after these updates :::
+
+ ===
+
+ === Nov 15, 2012 ===
+1. Cleaned the board till entires upto 4 Nov.
+
+::: DCHub RESTARTED :::
+
+ ===
+
+ === Nov 20, 2012 ===
+1. Cleaned the readboard off erroneous messages
+2. Cleaned the readboard off entries till 12th November.
+
+
+::: DCHub RESTARTED ::
+
+ ===
+
+
+ === Nov 21, 2012 ===
+1. Tweaked genie.py, and rewrote to genie_v2.py. The message now sent is no more than 200 lines in length. 
+   Done to accomodate for incompatibility of clients. Now, we won't have to trim the board.
+
+::: DCHub NOT restarted after this update :::
+ ===
+
+ === Nov 30, 2012 ===
+1. Cleaned the readboard. Entries till 22nd November removed.
+
+::: DCHub RESTARTED :::
+ ===
+
+
+ === Dec 25, 2012 ===
+1. Cleaned the readboard. Entries till 10th December removed. 
+
+::: DCHub RESTARTED :::
+ ===
+
+
+ === Dec 30, 2012 ===
+1. Updated the welcome message, adding information about Magnet links. 
+
+::: DCHub RESTARTED :::
+ ===
+
+ === January 6, 2013 ===
+1. Removed the minimum share requirements. Users don't need any minimum share size to connect now.
+2. Cleaned (trimmed) requests board. Old requests are in requests_Jan6
+
+::: DCHub RESTARTED :::
+ ===
