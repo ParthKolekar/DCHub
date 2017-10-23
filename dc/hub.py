@@ -1,223 +1,15 @@
 import os
-from ConfigParser import RawConfigParser
 import logging
-import urllib2
 import datetime
 from logging.handlers import SysLogHandler
+from .parser import IntelConfigParser
 from select import select
-from sets import Set as set
+from .client import DCHubClient
 import signal
 import socket
 import sys
 import time
-
-if os.name == 'posix':
-    try:
-        import grp
-        import pwd
-    except ImportError: pass
-
-__version__ = '0.2.4'
-myinfoformat = '$MyINFO $ALL %s %s%s$ $%s%s$%s$%i$|'
-# Make sure bots can import DCHub under chroot without sys.path trickery
-_mod = __import__('DCHub')
-
-class IntelConfigParser(RawConfigParser):
-    '''Configuration parser that saves configuration file format'''
-    def __init__(self):
-        RawConfigParser.__init__(self)
-        self.optionxform = str
-
-    def get_config(self, fil = None):
-        '''Read in old configuration file, return new configuration string'''
-        sections = self.sections()
-        sections.sort()
-        names, lines, outputlines = [], [], []
-        items = {}
-        currentsection = None
-        if fil is not None:
-            # If file is readable, get the existing config with which to
-            # merge, otherwise just return a brand new config
-            startpos = fil.tell()
-            fil.seek(0)
-            try:
-                if 'r' in fil.mode:
-                    lines = fil.read().split('\n')
-            except: pass
-        numlines = len(lines)
-        i = 0
-        while i < numlines:
-            line = lines[i]
-            strippedline = line.strip()
-            if not strippedline or strippedline[0] == '#':
-                # Leave blank lines and comments intact
-                pass
-            elif strippedline[0] == '[' and strippedline[-1] == ']':
-                if currentsection is not None:
-                    # New section started, but we still have items for the old
-                    # section, so write them out first
-                    for name, value in items.items():
-                        outputlines.append('%s = %s' % (name, value))
-                    sections.remove(currentsection)
-                currentsection = strippedline[1:-1]
-                if currentsection in sections:
-                    items = dict([(unicode(item[0]).strip(), unicode(item[1]).strip()) for item in self.items(currentsection)])
-                else:
-                    # Section was removed from the configuration, so delete
-                    # all related lines
-                    currentsection = None
-                    i += 1
-                    try: strippedline = lines[i].strip()
-                    except IndexError: break
-                    while not (strippedline and strippedline[0] == '[' and strippedline[-1] == ']'):
-                        i += 1
-                        try: strippedline = lines[i].strip()
-                        except IndexError: break
-                    continue
-            elif strippedline.count('=') or strippedline.count(':'):
-                name, value = '', ''
-                poseq, poscol = -1, -1
-                # Name-value pairs can be separated by either : or =.
-                # Find the separator closest to the left, and split there
-                try: poseq = strippedline.index('=')
-                except ValueError: name, value = strippedline.split(':',1)
-                else:
-                    try: poscol = strippedline.index(':')
-                    except ValueError: name, value = strippedline.split('=',1)
-                    else:
-                        if poseq < poscol:
-                            name, value = strippedline.split('=',1)
-                        else:
-                            name, value = strippedline.split(':',1)
-                name = name.strip()
-                value = value.strip()
-                if name in items:
-                    if value != items[name]:
-                        line = '%s = %s' % (name, items[name])
-                    del items[name]
-                else:
-                    # Item was removed from the configuration, so ignore the line
-                    i += 1
-                    continue
-            outputlines.append(line)
-            i += 1
-        if currentsection is not None:
-            for name, value in items.items():
-                # File ended, but we still have items left for the last section
-                outputlines.append('%s = %s' % (name, value))
-            sections.remove(currentsection)
-        for section in sections:
-            # File ended, but there were sections added to the configuration
-            # so we need to add them and their values
-            outputlines.append('')
-            outputlines.append('[%s]' % section)
-            outputlines.append('')
-            for name, value in self.items(section):
-                outputlines.append('%s = %s' % (name, value))
-        if fil is not None:
-            # Return the file to its starting position
-            fil.seek(startpos)
-        return '\n'.join(outputlines)
-
-class DCHubUser(object):
-    '''Any user of a DC Hub (client or bot)'''
-
-    def __init__(self):
-        self.nick = None
-        self.version = ''
-        self.description = ''
-        self.tag = ''
-        self.ip = ''
-        self.speed = '56Kbps'
-        self.speedclass = 1
-        self.email = ''
-        self.sharesize = 0
-        self.myinfo = ''
-        self.lastcommandtime = time.time()
-        self.ignoremessages = False
-        self.givenicklist = False
-        self.starttime = time.time()
-        self.supports = []
-        # Limits for each user, usually the same as the hub's defaults
-        self.limits = {}
-
-    def close(self):
-        pass
-
-    def sendmessage(self, message):
-        pass
-
-class DCHubClient(DCHubUser):
-    '''Client connecting to the hub'''
-
-    def __init__(self, (sock, (ip, port))):
-        DCHubUser.__init__(self)
-        self.socket = sock
-        self.socketid = sock.fileno()
-        self.account = None
-        self.ip = ip
-        self.port = port
-        self.key = ''
-        self.loggedin = False
-        self.op = False
-        self.idstring = '%s:%s/' % (self.ip, self.port)
-        self.myinfo = myinfoformat % (self.nick, self.description, self.tag, self.speed, chr(self.speedclass), self.email, self.sharesize)
-        self.validcommands = set('Key Supports ValidateNick'.split())
-        # Necessary for spam/flood prevention
-        self.recentmessages, self.searchtimes, self.myinfotimes = [], [], []
-        self.commandtimes = []
-        # Incoming and outgoing buffers for client
-        self.incoming = ['']
-        self.outgoing = ''
-
-    def close(self):
-        '''Close related socket connection'''
-        self.socket.close()
-
-    def sendmessage(self, message):
-        '''Place a message in the outgoing message buffer for the user'''
-        if not self.ignoremessages:
-            self.outgoing += message
-            self.lastcommandtime = time.time()
-
-class DCHubBot(DCHubUser):
-    '''Bot that runs in the same process as the hub
-
-    When making DCHubBot subclasses, if you place it in the bots directory and
-    do not want the bot to appear in the hub, set it's active attribute to
-    False.  This will be useful if you are further subclassing that bot and
-    don't want the bot itself to appear in the hub.
-    '''
-    active = True
-    isDCHubBot = True
-    def __init__(self, hub, nick = 'DCHubBot'):
-        DCHubUser.__init__(self)
-        self.hub = hub
-        self.nick = nick
-        self.ignoremessages = True
-        self.idstring = 'DCHubBot/%s' % nick
-        self.myinfo = myinfoformat % (self.nick, self.description, self.tag, self.speed, chr(self.speedclass), self.email, self.sharesize)
-        # If invisble, doesn't show up in user list
-        self.visible = True
-        # If not an op, show up as regular user instead
-        self.op = True
-        # Hub functions to wrap or replace
-        self.replace, self.execbefore, self.execafter = {}, {}, {}
-        hub.setuplimits(self)
-
-    def processcommand(self, user, command):
-        '''Process command given to bot via private message'''
-        ######## JohnDoe
-        if self.nick == 'Genie':
-            self.hub.got_Genie(user,command,'give_PrivateMessage')
-        if self.nick == 'TVInfo':
-            self.hub.got_TVInfo(user,command)
-        ######## JohnDoe
-        pass
-
-    def start(self):
-        '''Initialize hub environment for bot'''
-        pass
+import pwd
 
 class DCHub(object):
     '''Direct Connect Hub
@@ -300,7 +92,7 @@ class DCHub(object):
                     ll = loglevel
                     if timediff > warningtime:
                         ll = warninglevel
-            except Exception, error:
+            except Exception as error:
                 self.log.log(ll, '%s took %0.3f seconds (called with %s %s, raising %s: %r)' % (function.func_name, timediff, args, kwargs, error.__class__.__name__, str(error)))
                 raise
             else:
@@ -362,7 +154,7 @@ class DCHub(object):
     def cleanup(self):
         '''Close sockets and remove temporary files'''
         if not self.reloadonexit:
-            for sock in self.listensocks.itervalues():
+            for sock in self.listensocks.values():
                 sock.close()
             for user in self.sockets.values():
                 self.removeuser(user)
@@ -377,7 +169,9 @@ class DCHub(object):
         '''Create an individual listening socket'''
         listensock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         listensock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        print("Binding")
         listensock.bind((ip, port))
+        print("Bound")
         listensock.listen(1)
         self.listensocks[listensock.fileno()] = listensock
 
@@ -423,10 +217,11 @@ class DCHub(object):
         results = []
         for modulename, functionname, ugname in [('pwd', 'getpwnam', self.username), ('grp', 'getgrnam', self.groupname)]:
             try:
+                print(modulename)
                 results.append(int(ugname))
             except ValueError:
                 if not modulename in globals():
-                    print 'CRITICAL: %s module not available, can\'t change ids, exiting'
+                    print("CRITICAL: %s module not available, can\'t change ids, exiting")
                     sys.exit(1)
                 results.append(getattr(globals()[modulename], functionname)(ugname)[2])
         return results
@@ -447,8 +242,8 @@ class DCHub(object):
 
     def getusercommands(self, user):
         '''Return command string containing all commands the user has access to'''
-        commands = self.usercommands.values()
-        commands.sort(lambda uc1, uc2: cmp( uc1['position'], uc2['position']))
+        commands = list(self.usercommands.values())
+        commands.sort(key = lambda uc: uc['position'])
         # Remove all previous user commands for the user
         message = '$UserCommand 255 7 |'
         for command in commands:
@@ -466,7 +261,7 @@ class DCHub(object):
         '''
         users = self.sockets.values()
         timeout = 1
-        readsockets = self.listensocks.keys() + [user.socketid for user in users]
+        readsockets = list(self.listensocks.keys()) + [user.socketid for user in users]
         writesockets = [user.socketid for user in users if user.outgoing]
         readsockets, writesockets, errorsockets = select(readsockets, writesockets, readsockets+writesockets, timeout)
         self.handleerrorsockets(errorsockets)
@@ -500,6 +295,7 @@ class DCHub(object):
                 continue
             try:
                 data = user.socket.recv(self.buffersize)
+                data = str(data)
                 if not data:
                     self.log.log(self.loglevels['userdisconnect'], "Client disconnected: %s" % user.idstring)
                     self.removeuser(user)
@@ -539,7 +335,8 @@ class DCHub(object):
             except KeyError:
                 continue
             try:
-                sentsize = user.socket.send(user.outgoing)
+                data = user.outgoing.encode('utf-8')
+                sentsize = user.socket.send(data)
                 self.log.log(self.loglevels['datasent'], 'Data sent to %s: %r' % (user.idstring, user.outgoing[:sentsize]))
             except socket.error:
                 self.log.log(self.loglevels['socketerror'], "Removing connection due to error in sending data: %s" % user.idstring)
@@ -562,7 +359,7 @@ class DCHub(object):
                 self.give_HubFullRedirect(user)
             else:
                 self.giveHubIsFull(user)
-            raise ValueError, 'Hub is full, user cannot join'
+            raise ValueError('Hub is full, user cannot join')
 
     def ishubfull(self, user):
         '''Check to see if the hub is already full'''
@@ -578,7 +375,7 @@ class DCHub(object):
         checkattr = getattr(user, type)
         if checkattr in joins:
             self.removeuser(user)
-            raise ValueError, 'join flood detected'
+            raise ValueError('join flood detected')
         self.jointimes.append((curtime, checkattr))
 
     def loadaccounts(self):
@@ -688,13 +485,13 @@ class DCHub(object):
         '''
         def givewarning(option):
             '''Give warning that the option is not valid'''
-            print 'WARNING: Invalid configuration option or option value:', option
+            print("WARNING: Invalid configuration option or option value:"), option
         config = {}
         config.update(self.kwargs)
         truebools = 'yt1'
         attrs = dir(self)
         if not os.path.isfile(self.configfile):
-            print 'WARNING: Configuration file does not exist'
+            print("WARNING: Configuration file does not exist")
         else:
             self.configparser = IntelConfigParser()
             self.configparser.read(self.configfile)
@@ -723,7 +520,7 @@ class DCHub(object):
                         givewarning(value)
                     else:
                         self.bindinglocations.append((ip, port))
-        for key, value in config.iteritems():
+        for key, value in config.items():
             try:
                 if key not in attrs:
                     raise ValueError
@@ -782,7 +579,7 @@ class DCHub(object):
         if not os.path.isfile(self.welcomefile):
             return self.log.log(self.loglevels['missingfile'], 'Welcome message file does not exist')
         try:
-            fil = file(self.welcomefile,'r')
+            fil = open(self.welcomefile,'r')
             try:
                 self.welcome = fil.read()
             finally:
@@ -910,7 +707,7 @@ class DCHub(object):
         users that haven't sent a command in a while.
         '''
         curtime = time.time()
-        # self.sockets.itervalues() doesn't work here because users can be
+        # self.sockets.values() doesn't work here because users can be
         # removed in many of the sub functions, and that modifies the
         # self.sockets dictionary.  This could be worked around by not removing
         # any users until after the processing of commands, but that would
@@ -972,8 +769,10 @@ class DCHub(object):
         '''Setup default values for hub variables'''
         self.__class__.id += 1
         self.id = self.__class__.id
-        self.version = __version__
-        self.myinfoformat = myinfoformat
+        #self.version = __version__
+        self.version = "1.0"
+        #self.myinfoformat = myinfoformat
+        self.myinfoformat = '$MyINFO $ALL %s %s%s$ $%s%s$%s$%i$|'
         self.supers = {}
         self.reloadmodules = []
         self.nonreloadableattrs = set('''supers stop nonreloadableattrs
@@ -989,7 +788,7 @@ class DCHub(object):
         self.notifyspammers = False
         self.reloadonexit = False
         self.kwargs = kwargs
-        self.badchars = ''.join([chr(i) for i in range(9) + range(14,32) + [11, 12, 127]])
+        self.badchars = ''.join([chr(i) for i in list(range(9)) + list(range(14,32)) + [11, 12, 127]])
         self.badsrchars = self.badchars.replace('\x05','')
         # The DC protocol is only supposed to allow alphanumerics and $ as
         # search pattern characters, but since DC++ doesn't follow this, it
@@ -1089,7 +888,7 @@ class DCHub(object):
             errormsg = 'CRITICAL: Error setting up listening socket, exiting'
             if os.name == 'posix' and os.getuid() != 0 and self.port <= 1024:
                 errormsg += ' (maybe because the port is set to less than 1024 and you aren\'t running as root)'
-            print errormsg
+            print(errormsg)
             sys.exit(1)
 #       self.dropprivileges()
 
@@ -1130,13 +929,13 @@ class DCHub(object):
                 if self.debug:
                     self.log.exception(message)
                 else:
-                    print message, sys.exc_info()[1]
+                    print(message, sys.exc_info()[1])
         if self.usesyslog:
             try:
                 address = (self.sysloghost,514)
                 if self.sysloghost.count('/'):
                     if os.name != 'posix':
-                        raise ValueError, 'Can only log to Unix domain socket under Unix'
+                        raise ValueError('Can only log to Unix domain socket under Unix')
                     address = self.sysloghost
                 self.defaultsysloghandler = SysLogHandler(address ,getattr(SysLogHandler,'LOG_%s' % self.syslogfacility.upper()))
                 self.defaultsysloghandler.setFormatter(self.defaultsyslogformatter)
@@ -1146,7 +945,7 @@ class DCHub(object):
                 if self.debug or self.logfile:
                     self.log.exception(message)
                 else:
-                    print message, sys.exc_info()[1]
+                    print(message, sys.exc_info()[1])
 
     def setupsignals(self):
         '''Do an orderly shutdown upon receiving a signal.
@@ -1199,7 +998,7 @@ class DCHub(object):
                 try:
                     self.uid, self.gid = self.getuidgid()
                 except KeyError:
-                    print 'CRITICAL: Username or groupname is invalid, can\'t drop privileges, exiting'
+                    print("CRITICAL: Username or groupname is invalid, can\'t drop privileges, exiting")
                     #sys.exit(1)
             if self.chroot:
                 os.chroot(self.rootdir)
@@ -1224,7 +1023,7 @@ class DCHub(object):
                 if self.changeuidgid and os.getuid() == 0:
                     os.chown(self.pidfile, self.uid, self.gid)
             except:
-                print 'WARNING: Unable to write to the pidfile'
+                print("WARNING: Unable to write to the pidfile")
 
     def unloadbots(self):
         '''Remove all bots and unwrap related functions'''
@@ -1326,17 +1125,17 @@ class DCHub(object):
 
     def check_ChatMessage(self, user, nick, message, *args):
         if nick != user.nick:
-            raise ValueError, 'bad nick'
+            raise ValueError( 'bad nick')
         # Check whether the message taken by itself has problems
         messagesize = len(message)
         if messagesize > user.limits['maxmessagesize']:
-            raise ValueError, 'above maximum size'
+            raise ValueError( 'above maximum size')
         numcr = message.count('\r')
         numnl = message.count('\n')
         if numcr > numnl:
             numnl = numcr
         if numnl > user.limits['maxnewlinespermessage']:
-            raise ValueError, 'too many newlines'
+            raise ValueError( 'too many newlines')
         # Checks recently submitted messages to see if this message pushes the
         # user over any of its limits
         curtime = time.time()
@@ -1344,13 +1143,13 @@ class DCHub(object):
         user.recentmessages = [messageinfo for messageinfo in user.recentmessages if messageinfo[0] > pretime]
         nummessages = len(user.recentmessages)
         if nummessages >= user.limits['maxmessagespertimeperiod']:
-            raise ValueError, 'too many messages within time period'
+            raise ValueError( 'too many messages within time period')
         numchars = sum([messageinfo[1] for messageinfo in user.recentmessages]) + messagesize
         if numchars >= user.limits['maxcharacterspertimeperiod']:
-            raise ValueError, 'too many characters within time period'
+            raise ValueError( 'too many characters within time period')
         numnewlines = sum([messageinfo[2] for messageinfo in user.recentmessages]) + numnl
         if numnewlines >= user.limits['maxnewlinespertimeperiod']:
-            raise ValueError, 'too many newlines within time period'
+            raise ValueError( 'too many newlines within time period')
         user.recentmessages.append((curtime, messagesize, numnl, message))
 
     def got_ChatMessage(self, user, nick, message, *args):
@@ -1369,7 +1168,7 @@ class DCHub(object):
                 taskStat = getattr(self.bots['TVInfo'],'tvinfo')(message)
             self.log.log(self.loglevels['hubstatus'],'User:%s issued %s. Status:Success.'%(user.nick,message))
             self.give_PrivateMessage(self.bots['TVInfo'],user,'%s|'%(taskStat))
-        except Exception,e:
+        except Exception as e:
             self.log.log(self.loglevels['hubstatus'],'User:%s issued %s. Exception:%s'%(user.nick,message,e))
             self.give_PrivateMessage(self.bots['TVInfo'],user,'Some unexpected error Occured. Cut the programmer some slack.|')
 	################################################
@@ -1387,7 +1186,7 @@ class DCHub(object):
             try:
                 taskStat = getattr(self.bots['Genie'],'%s'%userCommand)(user,userCommandArgs)
                 self.log.log(self.loglevels['hubstatus'],'User:%s issued %s. Status:%s'%(user.nick,message,taskStat))
-            except Exception, e:
+            except Exception as e:
                 self.log.log(self.loglevels['hubstatus'],'User:%s issued %s. Exception:%s'%(user.nick,message,e))
         else:
             if messageType == 'sendmessage':
@@ -1416,9 +1215,9 @@ class DCHub(object):
 
     def check_PrivateMessage(self, user, sentto, sentfrom, nick, message, *args):
         if sentfrom != user.nick:
-            raise ValueError, 'bad sent from'
+            raise ValueError( 'bad sent from')
         if sentto not in self.users:
-            raise ValueError, 'bad sent to'
+            raise ValueError( 'bad sent to')
 
     def got_PrivateMessage(self, user, sentto, sentfrom, nick, message, *args):
         self.give_PrivateMessage(user, self.users[sentto], message)
@@ -1434,7 +1233,7 @@ class DCHub(object):
 
     def checkClose(self, user, nick, *args):
         if nick not in self.nicks:
-            raise ValueError, 'bad nick'
+            raise ValueError( 'bad nick')
 
     def gotClose(self, user, nick, *args):
         self.removeuser(self.users[nick])
@@ -1451,7 +1250,7 @@ class DCHub(object):
 
     def checkConnectToMe(self, user, nick, ip, port, *args):
         if nick not in self.users:
-            raise ValueError, 'bad nick'
+            raise ValueError( 'bad nick')
 
     def gotConnectToMe(self, user, nick, ip, port, *args):
         self.giveConnectToMe(user, self.users[nick], ip, port)
@@ -1486,7 +1285,7 @@ class DCHub(object):
 
     def checkGetINFO(self, user, nick, *args):
         if nick not in self.users:
-            raise ValueError, 'bad nick'
+            raise ValueError( 'bad nick')
 
     def gotGetINFO(self, user, nick, *args):
         self.giveMyINFO(self.users[nick])
@@ -1517,7 +1316,7 @@ class DCHub(object):
 
     def checkKick(self, user, nick, *args):
         if nick not in self.nicks:
-            raise ValueError, 'bad nick'
+            raise ValueError( 'bad nick')
 
     def gotKick(self, user, nick, *args):
         self.removeuser(self.nicks[nick])
@@ -1531,7 +1330,7 @@ class DCHub(object):
         tag = ''
         check, nick, rest = args.split(' ', 2)
         if check != '$ALL':
-            raise ValueError, 'bad format, no $ALL'
+            raise ValueError( 'bad format, no $ALL')
         description, space, speed, email, sharesize, blah = rest.split('$',5)
         if description[-1:] == '>':
             x = description.rfind('<')
@@ -1545,21 +1344,21 @@ class DCHub(object):
 
     def checkMyINFO(self, user, nick, description, tag, speed, speedclass, email, sharesize, *args):
         if nick != user.nick:
-            raise ValueError, "nick doesn't match"
+            raise ValueError( "nick doesn't match")
         for char in description + tag + email + speed:
             if char in self.badchars:
-                raise ValueError, 'bad character'
+                raise ValueError( 'bad character')
         #if speedclass not in range(1,12):       #JohnDoe commented this. Seemed unnecessary. Was bloking out Eiskalt.
-            #raise ValueError, 'bad speedclass'
+            #raise ValueError( 'bad speedclass')
         if sharesize < user.limits['minsharesize']:
-            raise ValueError, 'share size too low'
+            raise ValueError( 'share size too low')
         # Check for too many recent MyINFOs
         curtime = time.time()
         timelimit = curtime - user.limits['timeperiod']
         user.myinfotimes = [myinfotime for myinfotime in user.myinfotimes if myinfotime > timelimit]
         nummyinfos = len(user.myinfotimes)
         if nummyinfos >= user.limits['maxmyinfopertimeperiod']:
-            raise ValueError, 'Too many MyINFOs with time period %s: %i' % (user.idstring, nummyinfos)
+            raise ValueError( 'Too many MyINFOs with time period %s: %i' % (user.idstring, nummyinfos))
         user.myinfotimes.append(curtime)
 
     def gotMyINFO(self, user, nick, description, tag, speed, speedclass, email, sharesize, *args):
@@ -1598,7 +1397,7 @@ class DCHub(object):
 
     def checkMyPass(self, user, password, *args):
         if password != self.accounts[user.nick]['password']:
-            raise ValueError, 'bad pass'
+            raise ValueError( 'bad pass')
         if user.nick in self.nicks and self.nicks[user.nick] is not user:
             self.log.log(self.loglevels['duplicatelogin'], 'Duplicate correct login, removing current user %s, adding new user %s' % (self.nicks[user.nick].idstring, user.idstring))
             self.removeuser(self.nicks[user.nick])
@@ -1625,7 +1424,7 @@ class DCHub(object):
 
     def checkOpForceMove(self, user, nick, where, message, *args):
         if nick not in self.users:
-            raise ValueError, 'bad nick'
+            raise ValueError( 'bad nick')
 
     def gotOpForceMove(self, user, nick, where, message, *args):
         victim = self.users[nick]
@@ -1648,9 +1447,9 @@ class DCHub(object):
 
     def checkRevConnectToMe(self, user, sender, receiver, *args):
         if sender != user.nick:
-            raise ValueError, 'bad sender'
+            raise ValueError( 'bad sender')
         if receiver not in self.users:
-            raise ValueError, 'badreceiver'
+            raise ValueError( 'badreceiver')
 
     def gotRevConnectToMe(self, user, sender, receiver, *args):
         self.giveRevConnectToMe(user, self.users[receiver])
@@ -1663,7 +1462,7 @@ class DCHub(object):
     def parseSearch(self, user, args):
         lenargs = len(args)
         if lenargs > user.limits['maxsearchsize']:
-            raise ValueError, 'search string too large (%i bytes)' % lenargs
+            raise ValueError( 'search string too large (%i bytes)' % lenargs)
         host, searchstring = args.split(' ', 1)
         sizerestricted, isminimumsize, size, datatype, searchpattern = searchstring.split('?', 4)
         size = int(size)
@@ -1673,26 +1472,26 @@ class DCHub(object):
     def checkSearch(self, user, host, sizerestricted, isminimumsize, size, datatype, searchpattern, *args):
         if host[:4] == 'Hub:':
             if host[4:] != user.nick:
-                raise ValueError, 'bad nick'
+                raise ValueError( 'bad nick')
         else:
             ip, port = host.split(':',1)
             port = int(port)
             map(int, ip.split('.',3))
         if datatype not in self.validsearchdatatypes:
-            raise ValueError, 'bad datatype'
+            raise ValueError( 'bad datatype')
         if self.stringoverlaps(searchpattern, self.badsearchchars):
-            raise ValueError, 'bad search pattern character'
+            raise ValueError( 'bad search pattern character')
         if sizerestricted not in 'FT':
-            raise ValueError, 'bad size restricted'
+            raise ValueError( 'bad size restricted')
         if isminimumsize not in 'FT':
-            raise ValueError, 'bad is minimum size'
+            raise ValueError( 'bad is minimum size')
         # Check for too many recent searches
         curtime = time.time()
         timelimit = curtime - user.limits['timeperiod']
         user.searchtimes = [searchtime for searchtime in user.searchtimes if searchtime > timelimit]
         numsearches = len(user.searchtimes)
         if numsearches >= user.limits['maxsearchespertimeperiod']:
-            raise ValueError, 'Too many searches within time period'
+            raise ValueError( 'Too many searches within time period')
         user.searchtimes.append(curtime)
 
     def gotSearch(self, user, host, sizerestricted, isminimumsize, size, datatype, searchpattern, *args):
@@ -1707,7 +1506,7 @@ class DCHub(object):
         filesize, freeslots, totalslots = 0, 0, 0
         parts = args.split('\x05')
         if not (3 <= len(parts) <= 4):
-            raise ValueError, 'bad split'
+            raise ValueError( 'bad split')
         nick, path = parts[0].split(' ', 1)
         if len(parts) == 4:
             filesize, rest = parts[1].split(' ', 1)
@@ -1720,21 +1519,21 @@ class DCHub(object):
         hubname = ' '.join(hubparts[:-1])
         hubhost = hubparts[-1]
         if hubhost[0] + hubhost[-1] != '()':
-            raise ValueError, 'bad hubhost'
+            raise ValueError( 'bad hubhost')
         hubhost = hubhost[1:-1]
         requestor = parts[2]
         return nick, path, filesize, freeslots, totalslots, hubname, hubhost, requestor
 
     def checkSR(self, user, nick, path, filesize, freeslots, totalslots, hubname, hubhost, requestor, *args):
         if nick != user.nick:
-            raise ValueError, 'bad nick'
+            raise ValueError( 'bad nick')
         if hubhost.find(':') != -1:
             hubip, hubport = hubhost.split(':', 1)
             hubport = int(hubport)
         else:
             hubip = hubhost
         if requestor not in self.users:
-            raise ValueError, 'bad requestor'
+            raise ValueError( 'bad requestor')
 
     def gotSR(self, user, nick, path, filesize, freeslots, totalslots, hubname, hubhost, requestor, *args):
         self.giveSR(self.users[requestor], user, path, filesize, freeslots, totalslots, hubname, hubhost)
@@ -1768,7 +1567,7 @@ class DCHub(object):
 
     def checkUserIP(self, user, nick, *args):
         if nick not in self.nicks:
-            raise ValueError, 'bad nick'
+            raise ValueError( 'bad nick')
         if not user.op and nick != user.nick:
             # This is fairly common, so no need to log it
             return False
@@ -1787,9 +1586,9 @@ class DCHub(object):
 
     def checkValidateNick(self, user, nick, *args):
         if not nick:
-            raise ValueError, 'empty nick'
+            raise ValueError( 'empty nick')
         if len(nick) > user.limits['maxnicklength']:
-            raise ValueError, 'nick too long'
+            raise ValueError( 'nick too long')
         if nick in self.nicks:
             if nick not in self.accounts:
                 otheruser = self.nicks[nick]
@@ -1798,9 +1597,9 @@ class DCHub(object):
                     self.removeuser(otheruser)
                 else:
                     self.give_EmptyCommand(otheruser)
-                    raise ValueError, 'nick already in use'
+                    raise ValueError( 'nick already in use')
         elif self.stringoverlaps(nick, self.badnickchars):
-            raise ValueError, 'bad nick character'
+            raise ValueError( 'bad nick character')
 
     def gotValidateNick(self, user, nick, *args):
         user.nick = nick
@@ -1845,7 +1644,7 @@ class DCHub(object):
             message = '* %s%s|' % (nick, message[3:])
         else:
             message = '<%s> %s|' % (nick, message)
-        for user in self.users.itervalues():
+        for user in self.users.values():
             user.sendmessage(message)
 
     def give_EmptyCommand(self, user):
@@ -1913,7 +1712,7 @@ class DCHub(object):
         '''
         message = '$Hello %s|' % user.nick
         if newuser:
-            for client in self.users.itervalues():
+            for client in self.users.values():
                 if client is not user and 'NoHello' not in client.supports:
                     client.sendmessage(message)
         else:
@@ -1940,7 +1739,7 @@ class DCHub(object):
         '''
         message = '$HubName %s|' % self.name
         if user is None:
-            for user in self.users.itervalues():
+            for user in self.users.values():
                 user.sendmessage(message)
         else:
             user.sendmessage(message)
@@ -1952,12 +1751,12 @@ class DCHub(object):
         '''
         if newuser:
             message = []
-            for user in self.users.itervalues():
+            for user in self.users.values():
                 message.append(user.myinfo)
             message = ''.join(message)
             client.sendmessage(message)
         myinfo = client.myinfo
-        for user in self.users.itervalues():
+        for user in self.users.values():
             user.sendmessage(myinfo)
 
     def giveNickList(self, user):
@@ -1975,7 +1774,7 @@ class DCHub(object):
         else:
             message = '$OpList |'
         if user is None:
-            for user in self.users.itervalues():
+            for user in self.users.values():
                 user.sendmessage(message)
         else:
             user.sendmessage(message)
@@ -1983,7 +1782,7 @@ class DCHub(object):
     def giveQuit(self, user):
         '''Give hub a message that the user has disconnected'''
         message = '$Quit %s|' % user.nick
-        for client in self.users.itervalues():
+        for client in self.users.values():
             client.sendmessage(message)
 
     def giveRevConnectToMe(self, sender, receiver):
@@ -1993,7 +1792,7 @@ class DCHub(object):
     def giveSearch(self, searcher, host, sizerestricted, isminimumsize, size, datatype, searchpattern):
         '''Give search message from searcher to the entire hub'''
         message = '$Search %s %s?%s?%s?%s?%s|' % (host, sizerestricted, isminimumsize, size, datatype, searchpattern)
-        for user in self.users.itervalues():
+        for user in self.users.values():
             user.sendmessage(message)
 
     def giveSR(self, searcher, resulter, path, filesize, freeslots, totalslots, hubname, hubhost):
@@ -2015,11 +1814,11 @@ class DCHub(object):
         '''
         if user is None:
             if command is None:
-                for user in self.users.itervalues():
+                for user in self.users.values():
                     if 'UserCommand' in user.supports:
                         user.sendmessage(self.getusercommands(user))
             else:
-                for user in self.users.itervalues():
+                for user in self.users.values():
                     if 'UserCommand' in user.supports:
                         user.sendmessage(self.getusercommand(user, command))
         else:
@@ -2042,10 +1841,10 @@ class DCHub(object):
         if requestor is not None and requestee is not None:
             requestor.sendmessage('$UserIP %s %s|' % (requestee.nick, requestee.ip))
         elif requestor is not None:
-            requestor.sendmessage('$UserIP %s$$|' % '$$'.join(['%s %s' % (user.nick, user.ip) for user in self.users.itervalues()]))
+            requestor.sendmessage('$UserIP %s$$|' % '$$'.join(['%s %s' % (user.nick, user.ip) for user in self.users.values()]))
         elif requestee is not None:
             message = '$UserIP %s %s|' % (requestee.nick, requestee.ip)
-            for op in self.ops.itervalues():
+            for op in self.ops.values():
                 if 'UserIP2' in op.supports:
                     op.sendmessage(message)
 
@@ -2053,67 +1852,3 @@ class DCHub(object):
         '''Give a user a message that their login has been denied'''
         user.sendmessage('$ValidateDenide|')
 
-def parseargs():
-    '''Parses keyword arguments given on the command line'''
-    options = {}
-    opts = [opt for opt in ' '.join(sys.argv[1:]).split('--') if opt != '']
-    for opt in opts:
-        try: opt, value = opt.split('=',1)
-        except ValueError:
-            value = '1'
-        options[opt] = value.strip()
-    return options
-
-def reloadhub(hub):
-    '''Reload hub, including reloading all related modules
-
-    Any related modules that need to be reloaded when the hub is reloaded
-    should be appended to hub.reloadmodules.  Make sure that modules with
-    subclasses appear later in the list than modules on which they depend.
-    In general, all subclasses of DCHub (which are stored in their own
-    modules), should append the name of their module to self.reloadmodules
-    after running DCHub.setupdefaults.  In all cases the name of the subclass
-    must be the same as the name of the module.
-
-    This function creates a new hub from the reloaded modules, and copies the
-    attributes from the old hub to the new hub, unless the atributes are
-    callable or are listed in newhub.nonreloadableattrs.  If you are creating a
-    subclass of DCHub and there are attributes that should not be copied to the
-    reloaded hub, make sure you add the names of the attributes to the
-    nonreloadableattrs set.
-
-    Because of this behavior, simply modifying the default variable values in
-    setupdefaults will not change the values for the reloaded hub (since it
-    will copy over the old values).  Either add these values to the
-    nonreloadableattrs set or put new values in hub.postreload(), or
-    change the values before or after the reload using a bot such as PythonBot.
-
-    Note that reloading can and most likely will break subclasses that
-    aren't designed for it, and the problems can be tricky to fix.
-    '''
-    # Reload all necessary modules in the correct order
-    modulename = 'DCHub'
-    module = __import__(modulename)
-    for modulename in hub.reloadmodules:
-        module = reload(__import__(modulename))
-        hub.log.log(hub.loglevels['hubstatus'], 'Reloaded module %s' % modulename)
-    return getattr(module, modulename)(oldhub=hub)
-
-def run(Hub = DCHub):
-    '''Run the direct connect hub with keyword arguments given on the command line'''
-    options = parseargs()
-    dchub = Hub(**options)
-    dchub.mainloop()
-    while dchub.reloadonexit:
-        try:
-            reload(sys.modules['DCHub'])
-            dchub.log.log(dchub.loglevels['hubstatus'], 'Reloaded module DCHub')
-            dchub = sys.modules['DCHub'].reloadhub(dchub)
-        except:
-            dchub.handlereloaderror()
-        dchub.mainloop()
-    dchub.log.log(dchub.loglevels['hubstatus'], 'Shutting down logging system')
-    logging.shutdown()
-
-if __name__ == '__main__':
-    run()

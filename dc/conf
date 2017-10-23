@@ -6,7 +6,7 @@
 name = HyperNova
 
 # Bind to ip and port.  Blank ip binds to all available ip addresses
-ip = 10.2.32.223
+#ip = 10.2.32.223
 port = 411 
 
 # Locations of important files/directories.  Relative paths listed here are
